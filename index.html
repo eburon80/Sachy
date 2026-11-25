@@ -18,6 +18,13 @@ input{width:100%;font:inherit;padding:10px;border:1px solid var(--bd);border-rad
 .q i{position:absolute;font:normal 11px/1 system-ui}
 .mn{position:absolute;right:0;top:44px;z-index:5;min-width:230px;margin:0}.mn div{padding:10px 4px}
 </style></head><body><div id="app"></div>
+<script src="config.js"></script>
+<script>
+var showErr=function(t){var a=document.getElementById('app');a.innerHTML='<pre style="white-space:pre-wrap;color:#f66;padding:10px">'+String(t).replace(/</g,'&lt;')+'</pre>'};
+onerror=function(m,s,l){showErr(m+' ('+(s||'').split('/').pop()+':'+l+')')};
+addEventListener('unhandledrejection',function(e){showErr(e.reason&&e.reason.message||e.reason)});
+setTimeout(function(){var a=document.getElementById('app');if(!a.innerHTML)showErr('Aplikace se nespustila. Zkontroluj internet a soubor config.js.')},5000);
+</script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,signInAnonymously,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
