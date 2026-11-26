@@ -27,14 +27,15 @@ setTimeout(function(){var a=document.getElementById('app');if(!a.innerHTML)showE
 </script>
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import {getAuth,signInAnonymously,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {getAuth,signInAnonymously,onAuthStateChanged,linkWithPopup,GoogleAuthProvider,signInWithCredential} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {getFirestore,doc,setDoc,updateDoc,onSnapshot,collection,query,where,arrayUnion} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {getMessaging,getToken} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 import {Chess} from "https://cdn.jsdelivr.net/npm/chess.js@1.0.0/dist/esm/chess.js";
 const C=window.FIREBASE_CONFIG,app=initializeApp(C),auth=getAuth(app),db=getFirestore(app),$=document.getElementById('app');
 const ls=(k,v)=>v===undefined?localStorage.getItem(k):localStorage.setItem(k,v);
-let S={uid:null,name:ls('n')||'',th:+ls('th')||0},games=[],G=null,gid=null,ui={},draft=null,cur=0,sel=null,uG=null;
+let S={uid:null,name:ls('n')||'',th:+ls('th')||0},games=[],G=null,gid=null,ui={},draft=null,cur=0,sel=null,uG=null,uL=null,inst=null;
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>'&#'+c.charCodeAt()+';');
+const isEnd=s=>s==='done'||s==='ended';
 const cz=s=>s.replace(/^[NBRQK]/,m=>({N:'J',B:'S',R:'V',Q:'D',K:'K'}[m]));
 const mmss=ms=>{let s=Math.floor(ms/1e3),h=Math.floor(s/3600);s%=3600;return (h?h+':':'')+String(Math.floor(s/60)).padStart(h?2:1,'0')+':'+String(s%60).padStart(2,'0')};
 const side=()=>G&&G.w===S.uid?'w':'b';
@@ -65,16 +66,19 @@ th('Ledová modrá','#eaf4fb','#7fb0d6','#f0e9a0','#c9c26b'),
 th('Schematické','#e8edf0','#8fa9bb','#f0e9a0','#c9c26b',['#fff','#2f3b45','#2f3b45'],['#2f3b45','#2f3b45','#e8edf0'],1),
 th('Půlnoční tyrkys a korál','#2d3b4b','#1f2a36','#74662c','#5e5224',['#3fd0b0','#3fd0b0','#1f2a36'],['#ff7a59','#ff7a59','#1f2a36'],1,3)];
 const pc=(t,w,h)=>{const c=w?h.w:h.b;return `<svg viewBox="0 0 45 45"><g fill="${c[0]}" stroke="${c[1]}" stroke-width="${h.sw}" stroke-linejoin="round" style="--d:${c[2]}">${(h.g?GP:SP)[t]}</g></svg>`};
-const themes=()=>`<div class="card">${T.map((t,i)=>`<div class="r" style="padding:6px 0" data-a="pick" data-v="${i}"><span><i style="display:inline-block;width:18px;height:18px;background:${t.l}"></i><i style="display:inline-block;width:18px;height:18px;background:${t.d}"></i> ${t.n}</span>${i===S.th?'✓':''}</div>`).join('')}</div>`;
+const themes=()=>`<div class="card"><div class="r"><b>Vzhled</b><button data-a="theme" aria-label="Zavřít">✕</button></div>${T.map((t,i)=>`<div class="r" style="padding:6px 0" data-a="pick" data-v="${i}"><span><i style="display:inline-block;width:18px;height:18px;background:${t.l}"></i><i style="display:inline-block;width:18px;height:18px;background:${t.d}"></i> ${t.n}</span>${i===S.th?'✓':''}</div>`).join('')}</div>`;
+const form=()=>`<div class="card"><div class="r"><b>Nová výzva</b><button data-a="form" aria-label="Zavřít">✕</button></div><input id="lbl" placeholder="Jméno soupeře (vidíš jen ty)" value="${esc(ui.lbl)}" style="margin:8px 0"><div class="r" style="margin-bottom:8px">${[['w','Bílé'],['b','Černé'],['r','Náhodně']].map(c=>`<button data-a="col" data-v="${c[0]}" style="flex:1;${(ui.col||'w')===c[0]?'border-color:var(--ac);font-weight:600':''}">${c[1]}</button>`).join('')}</div><button class="p" data-a="create" style="width:100%">Odeslat výzvu</button></div>`;
 const home=()=>`<div class="r"><h2 style="margin:0">Šachy</h2><small>${esc(S.name)}</small></div>
-<div class="r" style="margin:10px 0;flex-wrap:wrap"><button class="p" data-a="new">Nová hra</button><button data-a="name">Jméno</button><button data-a="theme">Vzhled</button><button data-a="push">Notifikace</button></div>${ui.theme?themes():''}
-${games.map(g=>{const sd=g.w===S.uid?'w':'b',my=g.status==='play'&&g.turn===sd;return `<div class="card r" data-a="open" data-v="${g.id}"><div><b>${esc(g.names[sd==='w'?'b':'w'])||'čeká na soupeře'}</b><br><small>${g.moves.length} tahů${g.status==='done'?' · '+g.result:''}</small></div>${my?'<b>Jsi na tahu</b>':''}</div>`}).join('')||'<p><small>Zatím žádná partie. Založ novou a pošli odkaz kamarádovi.</small></p>'}`;
-const menu=()=>`<div class="card mn">${[['name','Jméno: '+esc(S.name)],['flip','Otočit šachovnici'],['nota','Notace'],['pgn','Export notace (PGN)'],['theme','Vzhled'],['push','Zapnout notifikace'],...(G.status==='play'?[['resign','Vzdát se']]:[]),['home','Moje partie']].map(a=>`<div data-a="${a[0]}">${a[1]}</div>`).join('')}</div>`;
+<div class="r" style="margin:10px 0;flex-wrap:wrap;justify-content:flex-start"><button class="p" data-a="form">Nová hra</button><button data-a="name">Jméno</button><button data-a="theme">Vzhled</button><button data-a="push">Notifikace</button>${inst?'<button data-a="install">Nainstalovat</button>':''}</div>${ui.form?form():''}${ui.theme?themes():''}
+${games.filter(g=>g.status!=='cancelled').map(g=>{const sd=g.w===S.uid?'w':'b',my=g.status==='play'&&g.turn===sd,lb=(g.lbl||{})[S.uid],nm=lb||g.names[sd==='w'?'b':'w']||'čeká na soupeře',st=g.status==='open'?'čeká na soupeře':g.status==='ended'?'ukončena':isEnd(g.status)?g.result:'';return `<div class="card r" data-a="open" data-v="${g.id}"><div><b>${esc(nm)}</b><br><small>${g.moves.length} tahů${st?' · '+st:''}</small></div><div class="r">${my?'<b>Jsi na tahu</b>':''}${g.status==='open'||g.status==='play'?`<button data-a="end" data-v="${g.id}" aria-label="Ukončit">✕</button>`:''}</div></div>`}).join('')||'<p><small>Zatím žádná partie. Založ novou a pošli odkaz kamarádovi.</small></p>'}`;
+const menu=()=>{const an=auth.currentUser&&auth.currentUser.isAnonymous;return `<div class="card mn"><div class="r"><small>Menu</small><b data-a="menu" style="padding:4px 8px">✕</b></div>${[['name','Jméno: '+esc(S.name)],['flip','Otočit šachovnici'],['nota','Notace'],['pgn','Export notace (PGN)'],['theme','Vzhled'],['push','Zapnout notifikace'],[an?'google':'x',an?'Přihlásit se přes Google':'Účet: '+esc(auth.currentUser&&auth.currentUser.email)],...(inst?[['install','Nainstalovat aplikaci']]:[]),...(G.status==='play'?[['resign','Vzdát se'],['end','Ukončit partii']]:[]),['home','Moje partie']].map(a=>`<div data-a="${a[0]}">${a[1]}</div>`).join('')}</div>`};
 const nota=()=>{const c=m=>m?`<div><b>${cz(m.san)}</b><br><small>${fdt(m.t)}${m.m?'<br>💬 '+esc(m.m):''}</small></div>`:'<div></div>';
-let h=`<div class="card"><div class="r"><b>${esc(G.names.w)} – ${esc(G.names.b)}</b><button data-a="pgn">PGN</button></div><div style="display:grid;grid-template-columns:28px 1fr 1fr;gap:8px;margin-top:8px">`;
+let h=`<div class="card"><div class="r"><b>${esc(G.names.w)} – ${esc(G.names.b)}</b><span><button data-a="pgn">PGN</button> <button data-a="nota" aria-label="Zavřít">✕</button></span></div><div style="display:grid;grid-template-columns:28px 1fr 1fr;gap:8px;margin-top:8px">`;
 for(let i=0;i<G.moves.length;i+=2)h+=`<span>${i/2+1}.</span>${c(G.moves[i])}${c(G.moves[i+1])}`;return h+'</div></div>'};
 function gameView(){
 if(!G)return '<p>Načítání…</p><button data-a="home">Domů</button>';
+if(G.status==='cancelled')return '<div class="card">Výzva byla zrušena.</div><button data-a="home">Domů</button>';
+if(!G.players.includes(S.uid))return '<div class="card">Tato partie je obsazená.</div><button data-a="home">Domů</button>';
 const sd=side(),op=sd==='w'?'b':'w',h=T[S.th],my=G.status==='play'&&G.turn===sd,ch=new Chess(G.fen),lm=G.moves[G.moves.length-1];
 let last=lm?[lm.f,lm.o]:[];
 if(draft){ch.move({from:draft.from,to:draft.to,promotion:'q'});last=[draft.from,draft.to]}
@@ -84,9 +88,9 @@ q+=`<div class="q" data-sq="${sq}" style="background:${bg};${sel===sq?'outline:3
 const bar=(s,top)=>`<div class="r"><div><b>${esc(G.names[s])||'Soupeř'}</b> ${G.turn===s&&G.status==='play'?'●':''}<br><small>⌛ <span id="t${s}">${mmss(G.think[s]+(s===sd&&my?cur:0))}</span> celkem</small></div>${top?`<div style="position:relative"><button data-a="menu" aria-label="Menu">☰</button>${ui.menu?menu():''}</div>`:my?`<div style="text-align:right"><b id="cur" style="font:600 20px monospace">${mmss(cur)}</b><br><small>tento tah · <span id="clk"></span></small></div>`:''}</div>`;
 return `${bar(op,1)}<div class="bd">${q}</div>${bar(sd)}
 ${G.status==='open'?'<div class="card">Čeká se na soupeře. <button class="p" data-a="share">Poslat odkaz</button></div>':''}
-${G.status==='done'?`<div class="card"><b>Konec partie: ${G.result}</b></div>`:''}
+${isEnd(G.status)?`<div class="card"><b>${G.status==='ended'?'Partie ukončena':'Konec partie: '+G.result}</b></div>`:''}
 ${draft?`<div class="card"><b>Tah ${Math.floor(G.moves.length/2)+1}. ${cz(draft.san)}</b> <small>neodesláno</small><input id="msg" placeholder="Zpráva pro soupeře (nepovinné)" value="${esc(ui.msg)}" style="margin:8px 0"><div class="r"><button data-a="back">Vrátit tah</button><button class="p" data-a="send">Odeslat tah</button></div></div>`:''}
-${ui.nota||G.status==='done'?nota():''}${ui.theme?themes():''}`}
+${(ui.nota??isEnd(G.status))?nota():''}${ui.theme?themes():''}`}
 function render(){$.innerHTML=!S.uid?'<p>Připojování…</p>':gid?gameView():home();upd()}
 function upd(){const s=document.getElementById('cur'),c=document.getElementById('clk'),t=G&&document.getElementById('t'+side());if(s)s.textContent=mmss(cur);if(c)c.textContent=new Date().toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'});if(t&&G.turn===side()&&G.status==='play')t.textContent=mmss(G.think[side()]+cur)}
 setInterval(()=>{if(gid&&G&&G.status==='play'&&G.turn===side()&&document.visibilityState==='visible'){cur+=1000;ls('t_'+gid,cur)}upd()},1000);
@@ -103,29 +107,36 @@ async function push(){if(await Notification.requestPermission()!=='granted')retu
 const reg=await navigator.serviceWorker.ready,t=await getToken(getMessaging(app),{vapidKey:C.vapidKey,serviceWorkerRegistration:reg});
 ls('tok',t);tkSync();alert('Notifikace zapnuty')}
 function tkSync(){const t=ls('tok');if(t&&G&&gid&&G.players.includes(S.uid)&&(G.tk||{})[side()]!==t)updateDoc(doc(db,'games',gid),{['tk.'+side()]:t})}
-function ping(title,body){const ot=(G.tk||{})[side()==='w'?'b':'w'];if(ot&&C.notifyUrl)fetch(C.notifyUrl,{method:'POST',headers:{'content-type':'application/json','x-key':C.notifyKey},body:JSON.stringify({token:ot,title,body,link:location.origin+location.pathname+'#g='+gid})}).catch(()=>{})}
+function ping(title,body,g=G,id=gid){const ot=(g.tk||{})[g.w===S.uid?'b':'w'];if(ot&&C.notifyUrl)fetch(C.notifyUrl,{method:'POST',headers:{'content-type':'application/json','x-key':C.notifyKey},body:JSON.stringify({token:ot,title,body,link:location.origin+location.pathname+'#g='+id})}).catch(()=>{})}
 const A={
-new:async()=>{const id=Math.random().toString(36).slice(2,8);await setDoc(doc(db,'games',id),{w:S.uid,b:null,players:[S.uid],names:{w:S.name,b:''},fen:new Chess().fen(),moves:[],turn:'w',think:{w:0,b:0},status:'open',created:Date.now()});location.hash='g='+id},
+form:()=>{ui.form=!ui.form},col:v=>{ui.col=v},x:()=>{},
+create:async()=>{const c=ui.col||'w',col=c==='r'?(Math.random()<.5?'w':'b'):c,id=Math.random().toString(36).slice(2,8),nm={w:'',b:''};nm[col]=S.name;
+await setDoc(doc(db,'games',id),{w:col==='w'?S.uid:null,b:col==='b'?S.uid:null,players:[S.uid],names:nm,lbl:{[S.uid]:ui.lbl||''},fen:new Chess().fen(),moves:[],turn:'w',think:{w:0,b:0},status:'open',created:Date.now()});location.hash='g='+id},
+end:async v=>{const id=v||gid,g=v?games.find(x=>x.id===v):G;if(!g)return;const o=g.status==='open';if(!confirm(o?'Zrušit výzvu?':'Ukončit partii? Notace zůstane uložena.'))return;
+await updateDoc(doc(db,'games',id),{status:o?'cancelled':'ended'});if(!o)ping(S.name+' ukončil(a) partii','Notace zůstává uložena',g,id)},
+google:async()=>{try{await linkWithPopup(auth.currentUser,new GoogleAuthProvider())}catch(e){if(e.code==='auth/credential-already-in-use')await signInWithCredential(auth,GoogleAuthProvider.credentialFromError(e));else throw e}},
+install:async()=>{if(inst){inst.prompt();inst=null}},
 open:v=>{location.hash='g='+v},home:()=>{location.hash=''},
-menu:()=>{ui.menu=!ui.menu},nota:()=>{ui.nota=!ui.nota},flip:()=>{ui.flip=!ui.flip},theme:()=>{ui.theme=!ui.theme},
+menu:()=>{ui.menu=!ui.menu},nota:()=>{ui.nota=!(ui.nota??isEnd(G.status))},flip:()=>{ui.flip=!ui.flip},theme:()=>{ui.theme=!ui.theme},
 pick:v=>{S.th=+v;ls('th',v)},
 name:()=>{const n=prompt('Tvoje jméno',S.name);if(n){S.name=n.slice(0,20);ls('n',S.name)}},
 pgn:()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([pgn()],{type:'application/x-chess-pgn'}));a.download=`sachy-${gid}.pgn`;a.click()},
 back:()=>{draft=null;ls('d_'+gid,'')},send,push,
 share:()=>{const u=location.origin+location.pathname+'#g='+gid;navigator.share?navigator.share({url:u,text:'Zahraj si se mnou šachy'}):navigator.clipboard.writeText(u).then(()=>alert('Odkaz zkopírován'))},
 resign:async()=>{if(confirm('Opravdu se vzdát?'))await updateDoc(doc(db,'games',gid),{status:'done',result:side()==='w'?'0-1':'1-0'});ping(S.name+' se vzdal(a)','Partie skončila')}};
-$.onclick=async e=>{const t=e.target.closest('[data-a],[data-sq]');if(!t)return;if(t.dataset.sq)return tap(t.dataset.sq);
+$.onclick=async e=>{const t=e.target.closest('[data-a],[data-sq]');if(!t){if(ui.menu){ui.menu=0;render()}return}if(t.dataset.sq)return tap(t.dataset.sq);
 const a=t.dataset.a;try{await A[a](t.dataset.v)}catch(x){alert(x.message)}if(a!=='menu')ui.menu=0;render()};
-$.oninput=e=>{if(e.target.id==='msg')ui.msg=e.target.value};
+$.oninput=e=>{if(e.target.id==='msg')ui.msg=e.target.value;if(e.target.id==='lbl')ui.lbl=e.target.value};
 function route(){uG&&uG();uG=null;G=null;ui={};sel=null;const m=location.hash.match(/g=(\w+)/);gid=m?m[1]:null;
 if(gid){draft=JSON.parse(ls('d_'+gid)||'null');cur=+ls('t_'+gid)||0;
 uG=onSnapshot(doc(db,'games',gid),async s=>{if(!s.exists()){G=null;return render()}G=s.data();
 if(draft&&draft.fen!==G.fen){draft=null;ls('d_'+gid,'')}
-if(!G.b&&G.w!==S.uid){await updateDoc(doc(db,'games',gid),{b:S.uid,players:arrayUnion(S.uid),'names.b':S.name,status:'play','tk.b':ls('tok')||null});return}
+if(G.status==='open'&&!G.players.includes(S.uid)){const sl=G.w?'b':'w';await updateDoc(doc(db,'games',gid),{[sl]:S.uid,players:arrayUnion(S.uid),['names.'+sl]:S.name,status:'play',['tk.'+sl]:ls('tok')||null});return}
 tkSync();render()})}else render()}
 window.onhashchange=route;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();inst=e;render()});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('firebase-messaging-sw.js');
 onAuthStateChanged(auth,u=>{if(!u)return signInAnonymously(auth);S.uid=u.uid;
 if(!S.name){S.name=(prompt('Tvoje jméno?')||'Hráč').slice(0,20);ls('n',S.name)}
-onSnapshot(query(collection(db,'games'),where('players','array-contains',u.uid)),s=>{games=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.created-a.created);if(!gid)render()});route()});
+uL&&uL();uL=onSnapshot(query(collection(db,'games'),where('players','array-contains',u.uid)),s=>{games=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.created-a.created);if(!gid)render()});route()});
 </script></body></html>
