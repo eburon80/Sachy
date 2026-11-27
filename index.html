@@ -125,6 +125,7 @@ google:async()=>{try{await linkWithPopup(auth.currentUser,new GoogleAuthProvider
 install:async()=>{if(inst){inst.prompt();inst=null}},
 testpush:async()=>{const t=ls('tok'),reg=await navigator.serviceWorker.getRegistration('firebase-messaging-sw.js'),i=['oprávnění: '+(window.Notification?Notification.permission:'nepodporováno'),'token: '+(t?'ano':'NE'),'service worker: '+(reg?'ano':'NE'),'worker url: '+(C.notifyUrl||'NE')];
 if(!t)return alert(i.join('\n')+'\n\nNejdřív klepni na Notifikace.');
+alert('Za 10 sekund se odešle test. Po OK přepni na plochu telefonu a appku nezavírej.');await new Promise(r=>setTimeout(r,10000));
 const r=await fetch(C.notifyUrl,{method:'POST',headers:{'content-type':'application/json','x-key':C.notifyKey},body:JSON.stringify({token:t,title:'Test',body:'Notifikace funguje',icon:location.origin+location.pathname+'icon-192.png',badge:location.origin+location.pathname+'badge.png',link:location.href})});
 alert(i.join('\n')+'\n\nWorker: '+r.status+'\n'+(await r.text()).slice(0,350))},
 open:v=>{location.hash='g='+v},home:()=>{location.hash=''},
