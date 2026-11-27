@@ -15,6 +15,7 @@ input{width:100%;font:inherit;padding:10px;border:1px solid var(--bd);border-rad
 .card{background:var(--c);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:10px 0}
 .bd{display:grid;grid-template-columns:repeat(8,1fr);border-radius:4px;overflow:hidden;margin:8px 0}
 .q{aspect-ratio:1;position:relative;padding:2px}.q svg{width:100%;height:100%;display:block}
+.dt{position:absolute;right:3px;top:3px;width:9px;height:9px;border-radius:50%;background:#fff;border:2px solid #111}
 .q i{position:absolute;font:normal 11px/1 system-ui}
 .mn{position:absolute;right:0;top:44px;z-index:5;min-width:230px;margin:0}.mn div{padding:10px 4px}
 </style></head><body><div id="app"></div>
@@ -33,7 +34,7 @@ import {getMessaging,getToken,deleteToken} from "https://www.gstatic.com/firebas
 import {Chess} from "https://cdn.jsdelivr.net/npm/chess.js@1.0.0/dist/esm/chess.js";
 const C=window.FIREBASE_CONFIG,app=initializeApp(C),auth=getAuth(app),db=getFirestore(app),$=document.getElementById('app');
 const ls=(k,v)=>v===undefined?localStorage.getItem(k):localStorage.setItem(k,v);
-let S={uid:null,name:ls('n')||'',th:+ls('th')||0},games=[],G=null,gid=null,ui={},draft=null,cur=0,sel=null,uG=null,uL=null,inst=null,pend=null;
+let S={uid:null,name:ls('n')||'',th:+ls('th')||0,dot:ls('dot')!=='0',cv:ls('cv')!=='0'},games=[],G=null,gid=null,ui={},draft=null,cur=0,sel=null,uG=null,uL=null,inst=null,pend=null;
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>'&#'+c.charCodeAt()+';');
 const live=g=>g.status==='play'||g.local;
 const isEnd=s=>s==='done'||s==='ended';
@@ -54,7 +55,7 @@ b:'<circle cx="22.5" cy="6" r="2.5"/><ellipse cx="22.5" cy="17" rx="6" ry="9"/><
 n:'<polygon points="12,39 15,26 22,19 16,19 12,23 10,21 18,9 21,5 24,8 31,13 33,24 32,39"/><circle cx="23" cy="13" r="1.5" style="fill:var(--d);stroke:none"/>',
 q:'<polygon points="10,34 12,14 18,22 22.5,10 27,22 33,14 35,34"/><circle cx="12" cy="12" r="2.2"/><circle cx="22.5" cy="8" r="2.2"/><circle cx="33" cy="12" r="2.2"/><rect x="10" y="34" width="25" height="5"/>',
 k:'<polygon points="14,34 16,18 29,18 31,34"/><rect x="21" y="4" width="3" height="12"/><rect x="17.5" y="7.5" width="10" height="3"/><rect x="11" y="34" width="23" height="5"/>'};
-const PW=['#fff','#1a1a1a','#1a1a1a'],PB=['#1a1a1a','#000','#f2f2f2'];
+const PW=['#fff6dc','#1a1a1a','#1a1a1a'],PB=['#1b2a4a','#0a1224','#e9f0ff'];
 const th=(n,l,d,h0,h1,w=PW,b=PB,g=0,sw=1.5)=>({n,l,d,h:[h0,h1],w,b,g,sw});
 const T=[th('Klasické dřevo','#f0d9b5','#b58863','#cdd26a','#aaa23a'),
 th('Světlé dřevo','#f7e6c4','#d9a56a','#e6e27a','#cfc653'),
@@ -64,10 +65,10 @@ th('Černobílý tisk','#ffffff','#8c8c8c','#ffe45c','#d9b800'),
 th('Pastel','#fbeef3','#c9b3e6','#fff1a8','#e2d27a'),
 th('Tmavé dřevo se zlatem','#a67c52','#5b3a24','#d4b04a','#a8892f',['#f3e3b0','#2a1a0c','#2a1a0c'],['#1a1208','#000','#e8c872']),
 th('Ledová modrá','#eaf4fb','#7fb0d6','#f0e9a0','#c9c26b'),
-th('Schematické','#e8edf0','#8fa9bb','#f0e9a0','#c9c26b',['#fff','#2f3b45','#2f3b45'],['#2f3b45','#2f3b45','#e8edf0'],1),
+th('Schematické','#e8edf0','#8fa9bb','#f0e9a0','#c9c26b',['#fff6dc','#2f3b45','#2f3b45'],['#1e3358','#1e3358','#e8edf0'],1),
 th('Půlnoční tyrkys a korál','#2d3b4b','#1f2a36','#74662c','#5e5224',['#3fd0b0','#3fd0b0','#1f2a36'],['#ff7a59','#ff7a59','#1f2a36'],1,3)];
 const pc=(t,w,h)=>{const c=w?h.w:h.b;return `<svg viewBox="0 0 45 45"><g fill="${c[0]}" stroke="${c[1]}" stroke-width="${h.sw}" stroke-linejoin="round" style="--d:${c[2]}">${(h.g?GP:SP)[t]}</g></svg>`};
-const themes=()=>`<div class="card"><div class="r"><b>Vzhled</b><button data-a="theme" aria-label="Zavřít">✕</button></div>${T.map((t,i)=>`<div class="r" style="padding:6px 0" data-a="pick" data-v="${i}"><span><i style="display:inline-block;width:18px;height:18px;background:${t.l}"></i><i style="display:inline-block;width:18px;height:18px;background:${t.d}"></i> ${t.n}</span>${i===S.th?'✓':''}</div>`).join('')}</div>`;
+const themes=()=>`<div class="card"><div class="r"><b>Vzhled</b><button data-a="theme" aria-label="Zavřít">✕</button></div>${T.map((t,i)=>`<div class="r" style="padding:6px 0" data-a="pick" data-v="${i}"><span><i style="display:inline-block;width:18px;height:18px;background:${t.l}"></i><i style="display:inline-block;width:18px;height:18px;background:${t.d}"></i> ${t.n}</span>${i===S.th?'✓':''}</div>`).join('')}<div class="r" style="padding:10px 0 2px;border-top:1px solid var(--bd);margin-top:6px" data-a="dot"><span>Označit černé figury tečkou</span><span>${S.dot?'✓':''}</span></div><div class="r" style="padding:8px 0 2px" data-a="cv"><span>Šachovnice jako obrázek (odolná vůči tmavému režimu)</span><span>${S.cv?'✓':''}</span></div></div>`;
 const form=()=>`<div class="card"><div class="r"><b>Nová výzva</b><button data-a="form" aria-label="Zavřít">✕</button></div><input id="lbl" placeholder="Jméno soupeře (vidíš jen ty)" value="${esc(ui.lbl)}" style="margin:8px 0"><div class="r" style="margin-bottom:8px">${[['w','Bílé'],['b','Černé'],['r','Náhodně']].map(c=>`<button data-a="col" data-v="${c[0]}" style="flex:1;${(ui.col||'w')===c[0]?'border-color:var(--ac);font-weight:600':''}">${c[1]}</button>`).join('')}</div><button class="p" data-a="create" style="width:100%">${(ui.col||'w')==='b'?'Odeslat výzvu':'Pokračovat'}</button></div>`;
 const home=()=>`<div class="r"><h2 style="margin:0">Šachy</h2><small>${esc(S.name)}${auth.currentUser&&!auth.currentUser.isAnonymous?' · '+esc(auth.currentUser.email):''}</small></div>
 ${auth.currentUser&&auth.currentUser.isAnonymous?'<div class="card r"><span>Přihlas se přes Google, ať o partie nepřijdeš.</span><button class="p" data-a="google">Přihlásit</button></div>':''}
@@ -84,17 +85,31 @@ if(!G.players.includes(S.uid))return '<div class="card">Tato partie je obsazená
 const sd=side(),op=sd==='w'?'b':'w',h=T[S.th],my=live(G)&&G.turn===sd,ch=new Chess(G.fen),lm=G.moves[G.moves.length-1];
 let last=lm?[lm.f,lm.o]:[];
 if(draft){ch.move({from:draft.from,to:draft.to,promotion:'q'});last=[draft.from,draft.to]}
-const fl=(sd==='b')!==!!ui.flip,bd=ch.board();let q='';
+const fl=(sd==='b')!==!!ui.flip,bd=ch.board();let q='';cvS={b:bd,fl,last,h,sel};
 for(let i=0;i<8;i++)for(let j=0;j<8;j++){const r=fl?7-i:i,c=fl?7-j:j,sq='abcdefgh'[c]+(8-r),p=bd[r][c],dk=(r+c)%2,bg=last.includes(sq)?h.h[dk]:dk?h.d:h.l,tc=dk?h.l:h.d;
-q+=`<div class="q" data-sq="${sq}" style="background:${bg};${sel===sq?'outline:3px solid #3b82f6;outline-offset:-3px':''}">${p?pc(p.type,p.color==='w',h):''}${j?'':`<i style="left:2px;top:2px;color:${tc}">${8-r}</i>`}${i<7?'':`<i style="right:2px;bottom:1px;color:${tc}">${'abcdefgh'[c]}</i>`}</div>`}
+q+=`<div class="q" data-sq="${sq}" style="background:${bg};${sel===sq?'outline:3px solid #3b82f6;outline-offset:-3px':''}">${p?pc(p.type,p.color==='w',h)+(S.dot&&p.color==='b'?'<b class="dt"></b>':''):''}${j?'':`<i style="left:2px;top:2px;color:${tc}">${8-r}</i>`}${i<7?'':`<i style="right:2px;bottom:1px;color:${tc}">${'abcdefgh'[c]}</i>`}</div>`}
 const bar=(s,top)=>`<div class="r"><div><b>${esc(G.names[s])||'Soupeř'}</b> ${G.turn===s&&G.status==='play'?'●':''}<br><small>⌛ <span id="t${s}">${mmss(G.think[s]+(s===sd&&my?cur:0))}</span> celkem</small></div>${top?`<div style="position:relative"><button data-a="menu" aria-label="Menu">☰</button>${ui.menu?menu():''}</div>`:my?`<div style="text-align:right"><b id="cur" style="font:600 20px monospace">${mmss(cur)}</b><br><small>tento tah · <span id="clk"></span></small></div>`:''}</div>`;
-return `${bar(op,1)}<div class="bd">${q}</div>${bar(sd)}
+return `${bar(op,1)}${S.cv?'<div class="bd" style="display:block"><canvas id="cv" style="width:100%;aspect-ratio:1;display:block"></canvas></div>':`<div class="bd">${q}</div>`}${bar(sd)}
 ${G.local?'<div class="card">Zahraj první tah a odešli ho, tím odešleš i výzvu.</div>':''}
 ${G.status==='open'&&!G.local?'<div class="card">Čeká se na soupeře. <button class="p" data-a="share">Poslat odkaz</button></div>':''}
 ${isEnd(G.status)?`<div class="card"><b>${G.status==='ended'?'Partie ukončena':'Konec partie: '+G.result}</b></div>`:''}
 ${draft?`<div class="card"><b>Tah ${Math.floor(G.moves.length/2)+1}. ${cz(draft.san)}</b> <small>neodesláno</small><input id="msg" placeholder="Zpráva pro soupeře (nepovinné)" value="${esc(ui.msg)}" style="margin:8px 0"><div class="r"><button data-a="back">Vrátit tah</button><button class="p" data-a="send">Odeslat tah</button></div></div>`:''}
 ${(ui.nota??isEnd(G.status))?nota():''}${ui.theme?themes():''}`}
-function render(){$.innerHTML=!S.uid?'<p>Připojování…</p>':gid?gameView():home();upd()}
+let cvS=null,cvId=0;const IC={};
+const pimg=(t,w,h)=>{const k=S.th+t+w;return IC[k]||(IC[k]=new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(i);i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(pc(t,w,h).replace('<svg ','<svg xmlns="http://www.w3.org/2000/svg" '))}))};
+async function drawBoard(){const c=document.getElementById('cv');if(!c||!cvS)return;const id=++cvId,{b,fl,last,h,sel:sl}=cvS,w=Math.round(c.clientWidth*(devicePixelRatio||1))||360,n=w/8;
+const keys=new Set();b.forEach(r=>r.forEach(p=>{if(p)keys.add(p.type+p.color)}));const im={};await Promise.all([...keys].map(async k=>{im[k]=await pimg(k[0],k[1]==='w',h)}));if(id!==cvId)return;
+c.width=w;c.height=w;const x=c.getContext('2d');
+for(let i=0;i<8;i++)for(let j=0;j<8;j++){const r=fl?7-i:i,q=fl?7-j:j,sq='abcdefgh'[q]+(8-r),dk=(r+q)%2,p=b[r][q];
+x.fillStyle=last.includes(sq)?h.h[dk]:dk?h.d:h.l;x.fillRect(j*n,i*n,n,n);
+x.fillStyle=dk?h.l:h.d;x.font=Math.round(n*.2)+'px system-ui';
+if(j===0){x.textAlign='left';x.textBaseline='top';x.fillText(8-r,j*n+3,i*n+2)}
+if(i===7){x.textAlign='right';x.textBaseline='bottom';x.fillText('abcdefgh'[q],(j+1)*n-3,(i+1)*n-2)}
+if(p){x.drawImage(im[p.type+p.color],j*n+n*.04,i*n+n*.04,n*.92,n*.92);
+if(S.dot&&p.color==='b'){x.beginPath();x.arc((j+1)*n-n*.16,i*n+n*.16,n*.09,0,7);x.fillStyle='#fff';x.fill();x.lineWidth=n*.04;x.strokeStyle='#111';x.stroke()}}
+if(sl===sq){x.strokeStyle='#3b82f6';x.lineWidth=n*.08;x.strokeRect(j*n+n*.04,i*n+n*.04,n*.92,n*.92)}}}
+addEventListener('resize',()=>drawBoard());
+function render(){$.innerHTML=!S.uid?'<p>Připojování…</p>':gid?gameView():home();upd();drawBoard()}
 function upd(){const s=document.getElementById('cur'),c=document.getElementById('clk'),t=G&&document.getElementById('t'+side());if(s)s.textContent=mmss(cur);if(c)c.textContent=new Date().toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'});if(t&&G.turn===side()&&G.status==='play')t.textContent=mmss(G.think[side()]+cur)}
 setInterval(()=>{if(gid&&G&&live(G)&&G.turn===side()&&document.visibilityState==='visible'){cur+=1000;ls('t_'+gid,cur)}upd()},1000);
 function tap(sq){if(!G||!live(G)||G.turn!==side()||draft)return;const b=new Chess(G.fen),p=b.get(sq);
@@ -123,6 +138,8 @@ end:async v=>{const id=v||gid,g=v?games.find(x=>x.id===v):G;if(!g)return;const o
 await updateDoc(doc(db,'games',id),{status:o?'cancelled':'ended'});if(!o)ping(S.name+' ukončil(a) partii','Partie ukončena bez vítěze. Notace zůstává uložena.',g,id)},
 google:async()=>{try{await linkWithPopup(auth.currentUser,new GoogleAuthProvider())}catch(e){if(e.code==='auth/credential-already-in-use')await signInWithCredential(auth,GoogleAuthProvider.credentialFromError(e));else throw e}},
 hide:async v=>{if(!confirm('Odstranit partii z tvého seznamu? Soupeř ji dál uvidí. Notaci můžeš předtím exportovat v partii (☰ → PGN).'))return;await updateDoc(doc(db,'games',v),{['hide.'+S.uid]:true})},
+dot:()=>{S.dot=!S.dot;ls('dot',S.dot?'1':'0')},
+cv:()=>{S.cv=!S.cv;ls('cv',S.cv?'1':'0')},
 install:async()=>{if(inst){inst.prompt();inst=null}},
 open:v=>{location.hash='g='+v},home:()=>{location.hash=''},
 menu:()=>{ui.menu=!ui.menu},nota:()=>{ui.nota=!(ui.nota??isEnd(G.status))},flip:()=>{ui.flip=!ui.flip},theme:()=>{ui.theme=!ui.theme},
@@ -134,7 +151,8 @@ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{typ
 back:()=>{draft=null;ls('d_'+gid,'')},send,push,
 share:()=>{const u=location.origin+location.pathname+'#g='+gid;navigator.share?navigator.share({url:u,text:'Zahraj si se mnou šachy'}):navigator.clipboard.writeText(u).then(()=>alert('Odkaz zkopírován'))},
 resign:async()=>{if(confirm('Opravdu se vzdát?'))await updateDoc(doc(db,'games',gid),{status:'done',result:side()==='w'?'0-1':'1-0'});ping(S.name+' se vzdal(a)','Vyhrál(a) jsi – soupeř se vzdal')}};
-$.onclick=async e=>{const t=e.target.closest('[data-a],[data-sq]');if(!t){if(ui.menu){ui.menu=0;render()}return}if(t.dataset.sq)return tap(t.dataset.sq);
+$.onclick=async e=>{if(e.target.id==='cv'&&cvS){if(ui.menu){ui.menu=0;render();return}const r=e.target.getBoundingClientRect(),i=Math.floor((e.clientY-r.top)/r.height*8),j=Math.floor((e.clientX-r.left)/r.width*8),R=cvS.fl?7-i:i,Q=cvS.fl?7-j:j;return tap('abcdefgh'[Q]+(8-R))}
+const t=e.target.closest('[data-a],[data-sq]');if(!t){if(ui.menu){ui.menu=0;render()}return}if(t.dataset.sq)return tap(t.dataset.sq);
 const a=t.dataset.a;try{await A[a](t.dataset.v)}catch(x){alert(x.message)}if(a!=='menu')ui.menu=0;render()};
 $.oninput=e=>{if(e.target.id==='msg')ui.msg=e.target.value;if(e.target.id==='lbl')ui.lbl=e.target.value};
 function route(){uG&&uG();uG=null;G=null;ui={};sel=null;const m=location.hash.match(/g=(\w+)/);gid=m?m[1]:null;
