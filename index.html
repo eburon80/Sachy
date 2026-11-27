@@ -35,7 +35,7 @@ const C=window.FIREBASE_CONFIG,app=initializeApp(C),auth=getAuth(app),db=getFire
 const ls=(k,v)=>v===undefined?localStorage.getItem(k):localStorage.setItem(k,v);
 let S={uid:null,name:ls('n')||'',th:+ls('th')||0,cv:ls('cv')!=='0'},games=[],G=null,gid=null,ui={},draft=null,cur=0,sel=null,uG=null,uL=null,inst=null,pend=null;
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>'&#'+c.charCodeAt()+';');
-const VER='5';
+const VER='6';
 const live=g=>g.status==='play'||g.local;
 const isEnd=s=>s==='done'||s==='ended';
 const cz=s=>s.replace(/^[NBRQK]/,m=>({N:'J',B:'S',R:'V',Q:'D',K:'K'}[m]));
@@ -107,10 +107,11 @@ else if(tag==='rect'){const x=a('x'),y=a('y'),w=a('width'),h=a('height'),r=a('rx
 else d='M'+A.points.trim().replace(/\s+/g,' L')+'Z';
 out.push({p:new Path2D(d),k:kind(A.style||'')})});
 return SH[k]=out}
-function drawPiece(x,px,py,n,t,w,h){const c=w?h.w:h.b,lw=h.sw>2?h.sw:h.sw*2,sh=shapes(h.g,t);x.save();x.translate(px,py);x.scale(n/45,n/45);x.lineJoin='round';x.lineCap='butt';
-sh.forEach(s=>{if(s.k==='b'){x.fillStyle=c[1];x.strokeStyle=c[1];x.lineWidth=lw;x.fill(s.p);x.stroke(s.p)}else if(s.k==='c'){x.strokeStyle=c[1];x.lineWidth=2.2;x.stroke(s.p)}});
-sh.forEach(s=>{if(s.k==='b'){x.fillStyle=c[0];x.fill(s.p)}});
-sh.forEach(s=>{if(s.k==='e'){x.fillStyle=c[2];x.fill(s.p)}else if(s.k==='l'){x.strokeStyle=c[2];x.lineWidth=1.2;x.stroke(s.p)}});
+function drawPiece(x,px,py,n,t,w,h){const c=w?h.w:h.b,sh=shapes(h.g,t);x.save();x.translate(px,py);x.scale(n/45,n/45);x.lineJoin='round';x.lineCap='butt';
+sh.forEach(s=>{if(s.k==='b'){x.fillStyle=c[0];x.strokeStyle=c[1];x.lineWidth=h.sw;x.fill(s.p);x.stroke(s.p)}
+else if(s.k==='c'){x.strokeStyle=c[1];x.lineWidth=2.2;x.stroke(s.p)}
+else if(s.k==='e'){x.fillStyle=c[2];x.fill(s.p)}
+else{x.strokeStyle=c[2];x.lineWidth=1.2;x.stroke(s.p)}});
 x.restore()}
 function drawBoard(){const c=document.getElementById('cv');if(!c||!cvS)return;const {b,fl,last,h,sel:sl}=cvS,w=Math.round(c.clientWidth*(devicePixelRatio||1))||360,n=w/8;
 c.width=w;c.height=w;const x=c.getContext('2d');
