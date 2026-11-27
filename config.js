@@ -5,7 +5,7 @@ var FIREBASE_CONFIG = {
   storageBucket: "chessfriend-713b7.firebasestorage.app",
   messagingSenderId: "19207036624",
   appId: "1:19207036624:web:d2baae46c02e709c5c48d5",
-  vapidKey: "",   // doplníš později (Cloud Messaging → Web Push certificates)
-  notifyUrl: "",  // adresa Cloudflare Workeru, doplníš později
-  notifyKey: ""   // heslo KEY z Cloudflare, doplníš později
+  vapidKey: "BGHPySNOmLOtptxfHKpn14EloW2J4xAiVdFPDbNiPurnqVbjZfRWXtZMDcDe8CyqvXUCb0f_nojGI0FyRmUj-sg",
+  notifyUrl: "https://snowy-meadow-bd18.eburon89.workers.dev",
+  notifyKey: "d36zdhji6Drhb63dj"
 };
