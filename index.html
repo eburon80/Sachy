@@ -35,7 +35,7 @@ const C=window.FIREBASE_CONFIG,app=initializeApp(C),auth=getAuth(app),db=getFire
 const ls=(k,v)=>v===undefined?localStorage.getItem(k):localStorage.setItem(k,v);
 let S={uid:null,name:ls('n')||'',th:+ls('th')||0,cv:ls('cv')!=='0'},games=[],G=null,gid=null,ui={},draft=null,cur=0,sel=null,uG=null,uL=null,inst=null,pend=null;
 const esc=s=>String(s||'').replace(/[&<>"]/g,c=>'&#'+c.charCodeAt()+';');
-const VER='4';
+const VER='5';
 const live=g=>g.status==='play'||g.local;
 const isEnd=s=>s==='done'||s==='ended';
 const cz=s=>s.replace(/^[NBRQK]/,m=>({N:'J',B:'S',R:'V',Q:'D',K:'K'}[m]));
@@ -96,17 +96,30 @@ ${G.status==='open'&&!G.local?'<div class="card">Čeká se na soupeře. <button 
 ${isEnd(G.status)?`<div class="card"><b>${G.status==='ended'?'Partie ukončena':'Konec partie: '+G.result}</b></div>`:''}
 ${draft?`<div class="card"><b>Tah ${Math.floor(G.moves.length/2)+1}. ${cz(draft.san)}</b> <small>neodesláno</small><input id="msg" placeholder="Zpráva pro soupeře (nepovinné)" value="${esc(ui.msg)}" style="margin:8px 0"><div class="r"><button data-a="back">Vrátit tah</button><button class="p" data-a="send">Odeslat tah</button></div></div>`:''}
 ${(ui.nota??isEnd(G.status))?nota():''}${ui.theme?themes():''}`}
-let cvS=null,cvId=0;const IC={};
-const pimg=(t,w,h)=>{const k=S.th+t+w;return IC[k]||(IC[k]=new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.onerror=()=>r(i);i.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(pc(t,w,h).replace('<svg ','<svg xmlns="http://www.w3.org/2000/svg" '))}))};
-async function drawBoard(){const c=document.getElementById('cv');if(!c||!cvS)return;const id=++cvId,{b,fl,last,h,sel:sl}=cvS,w=Math.round(c.clientWidth*(devicePixelRatio||1))||360,n=w/8;
-const keys=new Set();b.forEach(r=>r.forEach(p=>{if(p)keys.add(p.type+p.color)}));const im={};await Promise.all([...keys].map(async k=>{im[k]=await pimg(k[0],k[1]==='w',h)}));if(id!==cvId)return;
+let cvS=null;const SH={};
+const kind=s=>!s?'b':s.includes('fill:var(--d)')?'e':s.includes('stroke:var(--d)')?'l':'c';
+function shapes(g,t){const k=(g?'g':'s')+t;if(SH[k])return SH[k];const out=[];
+(g?GP:SP)[t].replace(/<(\w+)([^>]*?)\/>/g,(m,tag,at)=>{const A={};at.replace(/([\w-]+)="([^"]*)"/g,(m2,n,v)=>{A[n]=v});const a=n=>+A[n]||0;let d;
+if(tag==='path')d=A.d;
+else if(tag==='circle'){const r=a('r'),x=a('cx'),y=a('cy');d=`M${x-r} ${y}a${r} ${r} 0 1 0 ${2*r} 0a${r} ${r} 0 1 0 ${-2*r} 0z`}
+else if(tag==='ellipse'){const rx=a('rx'),ry=a('ry'),x=a('cx'),y=a('cy');d=`M${x-rx} ${y}a${rx} ${ry} 0 1 0 ${2*rx} 0a${rx} ${ry} 0 1 0 ${-2*rx} 0z`}
+else if(tag==='rect'){const x=a('x'),y=a('y'),w=a('width'),h=a('height'),r=a('rx');d=`M${x+r} ${y}H${x+w-r}A${r} ${r} 0 0 1 ${x+w} ${y+r}V${y+h-r}A${r} ${r} 0 0 1 ${x+w-r} ${y+h}H${x+r}A${r} ${r} 0 0 1 ${x} ${y+h-r}V${y+r}A${r} ${r} 0 0 1 ${x+r} ${y}Z`}
+else d='M'+A.points.trim().replace(/\s+/g,' L')+'Z';
+out.push({p:new Path2D(d),k:kind(A.style||'')})});
+return SH[k]=out}
+function drawPiece(x,px,py,n,t,w,h){const c=w?h.w:h.b,lw=h.sw>2?h.sw:h.sw*2,sh=shapes(h.g,t);x.save();x.translate(px,py);x.scale(n/45,n/45);x.lineJoin='round';x.lineCap='butt';
+sh.forEach(s=>{if(s.k==='b'){x.fillStyle=c[1];x.strokeStyle=c[1];x.lineWidth=lw;x.fill(s.p);x.stroke(s.p)}else if(s.k==='c'){x.strokeStyle=c[1];x.lineWidth=2.2;x.stroke(s.p)}});
+sh.forEach(s=>{if(s.k==='b'){x.fillStyle=c[0];x.fill(s.p)}});
+sh.forEach(s=>{if(s.k==='e'){x.fillStyle=c[2];x.fill(s.p)}else if(s.k==='l'){x.strokeStyle=c[2];x.lineWidth=1.2;x.stroke(s.p)}});
+x.restore()}
+function drawBoard(){const c=document.getElementById('cv');if(!c||!cvS)return;const {b,fl,last,h,sel:sl}=cvS,w=Math.round(c.clientWidth*(devicePixelRatio||1))||360,n=w/8;
 c.width=w;c.height=w;const x=c.getContext('2d');
 for(let i=0;i<8;i++)for(let j=0;j<8;j++){const r=fl?7-i:i,q=fl?7-j:j,sq='abcdefgh'[q]+(8-r),dk=(r+q)%2,p=b[r][q];
 x.fillStyle=last.includes(sq)?h.h[dk]:dk?h.d:h.l;x.fillRect(j*n,i*n,n,n);
 x.fillStyle=dk?h.l:h.d;x.font=Math.round(n*.2)+'px system-ui';
 if(j===0){x.textAlign='left';x.textBaseline='top';x.fillText(8-r,j*n+3,i*n+2)}
 if(i===7){x.textAlign='right';x.textBaseline='bottom';x.fillText('abcdefgh'[q],(j+1)*n-3,(i+1)*n-2)}
-if(p){x.drawImage(im[p.type+p.color],j*n+n*.04,i*n+n*.04,n*.92,n*.92);}
+if(p)drawPiece(x,j*n+n*.04,i*n+n*.04,n*.92,p.type,p.color==='w',h);
 if(sl===sq){x.strokeStyle='#3b82f6';x.lineWidth=n*.08;x.strokeRect(j*n+n*.04,i*n+n*.04,n*.92,n*.92)}}}
 addEventListener('resize',()=>drawBoard());
 function render(){$.innerHTML=!S.uid?'<p>Připojování…</p>':gid?gameView():home();upd();drawBoard()}
