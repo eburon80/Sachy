@@ -29,7 +29,7 @@ setTimeout(function(){var a=document.getElementById('app');if(!a.innerHTML)showE
 import {initializeApp} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {getAuth,signInAnonymously,onAuthStateChanged,linkWithPopup,GoogleAuthProvider,signInWithCredential} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {getFirestore,doc,setDoc,updateDoc,onSnapshot,collection,query,where,arrayUnion} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import {getMessaging,getToken} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
+import {getMessaging,getToken,deleteToken} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 import {Chess} from "https://cdn.jsdelivr.net/npm/chess.js@1.0.0/dist/esm/chess.js";
 const C=window.FIREBASE_CONFIG,app=initializeApp(C),auth=getAuth(app),db=getFirestore(app),$=document.getElementById('app');
 const ls=(k,v)=>v===undefined?localStorage.getItem(k):localStorage.setItem(k,v);
@@ -108,7 +108,7 @@ if(G.local){const f={...G,fen:o.fen,moves:o.moves,turn:o.turn,think:{...G.think,
 await updateDoc(doc(db,'games',gid),o);ping(S.name+' odehrál '+mn+(sd==='w'?'. ':'… ')+cz(m.san),bd);draft=null;cur=0;ui.msg='';sel=null;ls('d_'+gid,'');ls('t_'+gid,0)}
 function pgn(){const mm=G.moves.map((m,i)=>(i%2?'':(i/2|0)+1+'. ')+m.san+` {${new Date(m.t).toISOString()} ${Math.round(m.th/1e3)}s${m.m?' "'+m.m.replace(/[{}"]/g,'')+'"':''}}`).join(' ');
 return `[Event "Šachy"]\n[Date "${new Date(G.created).toISOString().slice(0,10).replace(/-/g,'.')}"]\n[White "${G.names.w||'?'}"]\n[Black "${G.names.b||'?'}"]\n[Result "${G.result||'*'}"]\n\n${mm} ${G.result||'*'}\n`}
-async function pushOff(){ls('tok','');await Promise.all(games.filter(g=>(g.tk||{})[g.w===S.uid?'w':'b']).map(g=>updateDoc(doc(db,'games',g.id),{['tk.'+(g.w===S.uid?'w':'b')]:null})))}
+async function pushOff(){ls('tok','');try{await deleteToken(getMessaging(app))}catch(e){}try{const r=await navigator.serviceWorker.getRegistration('firebase-messaging-sw.js'),b=r&&await r.pushManager.getSubscription();if(b)await b.unsubscribe()}catch(e){}await Promise.all(games.filter(g=>(g.tk||{})[g.w===S.uid?'w':'b']).map(g=>updateDoc(doc(db,'games',g.id),{['tk.'+(g.w===S.uid?'w':'b')]:null})))}
 async function push(){if(ls('tok')){await pushOff();alert('Notifikace vypnuty');return}if(!C.vapidKey)return alert('V config.js chybí vapidKey');if(await Notification.requestPermission()!=='granted')return alert('Notifikace nejsou povoleny');
 const reg=await navigator.serviceWorker.ready,t=await getToken(getMessaging(app),{vapidKey:C.vapidKey,serviceWorkerRegistration:reg});
 ls('tok',t);tkSync();alert('Notifikace zapnuty')}
